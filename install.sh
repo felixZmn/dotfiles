@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # manual: 
-# vscode intellij signal
+# vscode intellij signal insomnia
 
 sudo apt install spotify
 
