@@ -14,6 +14,8 @@ set showmode            " show current mode
 set showmatch           " show matching brackets
 set colorcolumn=80      " ruler at end of line
 
+set backspace=indent,eol,start   " backspace over everything in insert mode
+
 syntax on               " enable syntax hilightning
 set number              " line numbers
 set expandtab           " tabs instead of spaces
