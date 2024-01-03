@@ -4,10 +4,9 @@ filetype plugin on
 filetype indent on
 
 " no anoying bells and whistles
-set noerrorbells
-set novisualbell
-set t_vb=
-set tm=500
+set visualbell          " use a visual bell instead of an audible
+set noerrorbells        " disables the error bells
+set t_vb=               " disables the terminal bell
 
 set showcmd             " 
 set showmode            " show current mode
