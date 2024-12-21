@@ -1,3 +1,8 @@
+" plugins
+call plug#begin()
+" List your plugins here
+call plug#end()
+
 " general settings
 filetype on
 filetype plugin on
@@ -14,6 +19,8 @@ set showmode            " show current mode
 set showmatch           " show matching brackets
 set colorcolumn=80      " ruler at end of line
 
+set clipboard^=unnamed,unnamedplus "copy/pase from and to system register
+
 syntax on               " enable syntax hilightning
 set number              " line numbers
 set expandtab           " tabs instead of spaces
@@ -27,7 +34,6 @@ set smartcase           " explicit search for capital letters
 set showmatch           " ???
 set hlsearch            " highlight search results
 set incsearch           " ???
-
 set magic               " wtf? 
 
 " wildmenu
@@ -42,3 +48,5 @@ inoremap { {}<Left>
 inoremap " ""<Left>
 
 inoremap <expr> <CR> search('{\%#}', 'n') ? "\<CR>\<CR>\<Up>\<C-f>" : "\<CR>" 
+
+"colorscheme nord       " Theme
