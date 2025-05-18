@@ -43,6 +43,6 @@
 [commit]
         gpgsign = true
 [gpg "ssh"]                                                                     
-        allowedSignersFile = /home/felix/.config/git/allowed_signers            
+        allowedSignersFile = /home/felix/.ssh/allowed_signers            
 [tag]                                                                           
         forceSignAnnotated = true
