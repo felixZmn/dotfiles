@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# place in a hooks folder
+# set core.hooksPath to this folder
+
+# Get commit message file path from Git
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Define allowed types
+ALLOWED_TYPES="build|change|chore|ci|docs|feat|fix|perf|refactor|revert|style|test"
+
+# Regex pattern explanation:
+# - ^: Start of the string
+# - (): Capture group
+# - \s* handles optional whitespace (for better UX)
+# - Scope is optional: (\([^)]+\))?
+# - Message must follow `:`
+PATTERN="^(${ALLOWED_TYPES})( \([^)]+\))?: .+"
+
+# Test the commit message against the pattern
+echo "$COMMIT_MSG" | grep -iEq "$PATTERN"
+
+if [ $? -ne 0 ]; then
+  echo "❌ Invalid commit message format!"
+  echo
+  echo "✅ Valid format: <type> (<scope>): message"
+  echo "   - <type> must be one of: ${ALLOWED_TYPES//|/, }"
+  echo "   - <scope> is optional"
+  echo "   - Example: fix(auth): handle login timeout"
+  echo
+  exit 1
+fi
+ 
+# If everything is fine
+exit 0
