@@ -1,3 +1,9 @@
+# ============================================================================
+# Git-Aware Prompt
+# ============================================================================
+# Displays branch, commit status (ahead/behind), staged files, and modifications
+# Uses git status --porcelain=v2 for efficiency
+
 function Get-GitStatus {
     $statusOutput = git status --porcelain=v2 --branch 2>$null
 

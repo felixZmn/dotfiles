@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# place in a hooks folder
-# set core.hooksPath to this folder
+# commit-msg - Git hook for conventional commits validation
+# Place in .git/hooks/ or use core.hooksPath to point to git/hooks/
 
 # Get commit message file path from Git
 COMMIT_MSG_FILE="$1"

@@ -1,0 +1,130 @@
+# Catppuccin Latte - k9s skin
+
+colors:
+  rosewater: &rosewater '#dc8a78'
+  flamingo:  &flamingo  '#dd7878'
+  pink:      &pink      '#ea76cb'
+  mauve:     &mauve     '#8839ef'
+  red:       &red       '#d20f39'
+  maroon:    &maroon    '#e64553'
+  peach:     &peach     '#fe640b'
+  yellow:    &yellow    '#df8e1d'
+  green:     &green     '#40a02b'
+  sky:       &sky       '#04a5e5'
+  lavender:  &lavender  '#7287fd'
+  blue:      &blue      '#1e66f5'
+  text:      &text      '#4c4f69'
+  overlay0:  &overlay0  '#6c6f85'
+  overlay1:  &overlay1  '#9ca0b0'
+  surface1:  &surface1  '#bcc0cc'
+  surface0:  &surface0  '#ccd0da'
+  base:      &base      '#eff1f5'
+
+  primary:   &primary   '#fe640b'
+
+
+k9s:
+  body:
+    fgColor: *text
+    bgColor: default
+    logoColor: *primary
+  prompt:
+    fgColor: *text
+    bgColor: default
+    suggestColor: *primary
+    border:
+      command: *overlay0
+      default: *overlay0
+  help:
+    fgColor: *text
+    bgColor: default
+    sectionColor: *primary
+    keyColor: *lavender
+    numKeyColor: *lavender
+  frame:
+    title:
+      fgColor: *primary
+      bgColor: default
+      highlightColor: *lavender
+      counterColor: *yellow
+      filterColor: *primary
+    border:
+      fgColor: *overlay0
+      focusColor: *overlay0
+    menu:
+      fgColor: *text
+      keyColor: *lavender
+      numKeyColor: *lavender
+    crumbs:
+      fgColor: *text
+      keyColor: *primary
+      bgColor: default
+      activeColor: *primary
+    status:
+      newColor: *text
+      modifyColor: *primary
+      addColor: *primary
+      pendingColor: *yellow
+      errorColor: *red
+      highlightColor: *primary
+      killColor: *red
+      completedColor: *primary
+  info:
+    fgColor: *primary
+    sectionColor: *text
+  views:
+    table:
+      fgColor: *text
+      bgColor: default
+      cursorFgColor: *surface0
+      cursorBgColor: *surface1
+      markColor: *lavender
+      header:
+        fgColor: *primary
+        bgColor: default
+        sorterColor: *primary
+        selectedSortColumnColor: *primary
+    xray:
+      fgColor: *text
+      bgColor: default
+      cursorColor: *surface1
+      cursorTextColor: *base
+      graphicColor: *lavender
+    charts:
+      bgColor: default
+      chartBgColor: default
+      dialBgColor: default
+      defaultDialColors:
+        - *green
+        - *red
+      defaultChartColors:
+        - *green
+        - *red
+      resourceColors:
+        cpu:
+          - *green
+          - *red
+        mem:
+          - *yellow
+          - *red
+    yaml:
+      keyColor: *primary
+      valueColor: *text
+      colonColor: *overlay0
+    logs:
+      fgColor: *text
+      bgColor: default
+      indicator:
+        fgColor: *lavender
+        bgColor: default
+        toggleOnColor: *green
+        toggleOffColor: *overlay0
+  dialog:
+    fgColor: *text
+    bgColor: default
+    buttonFgColor: *base
+    buttonBgColor: default
+    buttonFocusFgColor: *base
+    buttonFocusBgColor: *primary
+    labelFgColor: *lavender
+    fieldFgColor: *text

@@ -1,21 +1,21 @@
 [alias]
         lg = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) %C(bold yellow)%G?%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n'' %C(auto)%s%C(reset) %C(dim white)- author: %an - commiter: %cn%C(reset)'
+
 [user]
         name = Felix Zimmermann
-        email = 
+        email = felix.zimmermann.1.de+github@gmail.com 
         signingKey = /home/felix/.ssh/id_ed25519.pub
+
 [diff]
         tool = vscode
 [difftool "vscode"]
         cmd = code --wait --diff $LOCAL $REMOTE
+
 [merge]
-    tool = vscode
+        tool = vscode
 [mergetool "vscode"]
-    cmd = code --wait $MERGED
-[diff]
-    tool = vscode
-[difftool "vscode"]
-    cmd = code --wait --diff $LOCAL $REMOTE
+        cmd = code --wait $MERGED
+
 [color]
         ui = auto
 [color "branch"]
@@ -32,17 +32,20 @@
         added = green bold
         changed = yellow bold
         untracked = cyan bold
+
 [pull]
         rebase = true
 [init]
         defaultBranch = main
 [core]
         editor = vim
+	hooksPath = /home/felix/code/dotfiles/git/hooks
+
 [gpg]
         format = ssh
 [commit]
         gpgsign = true
-[gpg "ssh"]                                                                     
-        allowedSignersFile = /home/felix/.ssh/allowed_signers            
-[tag]                                                                           
+[gpg "ssh"]
+        allowedSignersFile = /home/felix/.ssh/allowed_signers
+[tag]
         forceSignAnnotated = true

@@ -1,4 +1,10 @@
-git_prompt_bold() {
+# ============================================================================
+# Git-Aware Prompt
+# ============================================================================
+# Displays branch, commit status (ahead/behind), staged files, and modifications
+# Uses git status --porcelain=v2 for efficiency
+
+git_info() {
     git status --porcelain=v2 --branch 2>/dev/null | awk '
     /^# branch.head/ { b=$3 }
     /^# branch.ab/   { a=$3; d=$4 }
@@ -36,4 +42,4 @@ git_prompt_bold() {
 
 userHost="\[\e[1;32m\]\u\[\e[m\]\[\e[1;32m\]@\[\e[m\]\[\e[1;32m\]\h\[\e[m\]"
 path="\[\e[1;34m\]\w\[\e[m\]"
-PS1="$userHost:$path\$(git_prompt_bold)\\$ "
+PS1="$userHost:$path\$(git_info)\\$ "

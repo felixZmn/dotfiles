@@ -1,0 +1,41 @@
+# .gitignore - Files and patterns to ignore in version control
+
+# Backup files
+*.backup
+*.backup.*
+*.swp
+*.swo
+*~
+.backup/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+*.exe
+*.dll
+
+# Sensitive data
+# Avoid committing SSH keys or user-specific secrets
+# Consider these local per-machine or use environment variables
+local-config
+secrets/
+*.key
+*.pem
+id_*
+known_hosts
+
+# IDE/Editor
+.vscode/
+.vim/
+.idea/
+
+# Build/temp
+node_modules/
+dist/
+build/
+*.log
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
