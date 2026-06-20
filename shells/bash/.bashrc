@@ -1,9 +1,3 @@
-# ============================================================================
-# Git-Aware Prompt
-# ============================================================================
-# Displays branch, commit status (ahead/behind), staged files, and modifications
-# Uses git status --porcelain=v2 for efficiency
-
 git_info() {
     git status --porcelain=v2 --branch 2>/dev/null | awk '
     /^# branch.head/ { b=$3 }
@@ -36,10 +30,27 @@ git_info() {
         if(w) printf " \001\033[1;31m\002~"
         
         # Reset
-        printf "\001\033[0m\002 "
+        printf "\001\033[0m\002"
     }'
+}
+
+kube_info() {
+    local ctx
+
+    ctx=$(kubectl config current-context 2>/dev/null) || return 0
+
+    [[ -n "$ctx" ]] || return 0
+
+    # Bold Cyan, visually distinct from the git colors
+    printf "\001\033[1;36m\002 [☸ %s]\001\033[0m\002" "$ctx"
 }
 
 userHost="\[\e[1;32m\]\u\[\e[m\]\[\e[1;32m\]@\[\e[m\]\[\e[1;32m\]\h\[\e[m\]"
 path="\[\e[1;34m\]\w\[\e[m\]"
-PS1="$userHost:$path\$(git_info)\\$ "
+
+PS1="$userHost:$path\$(kube_info)\$(git_info) \\$ "
+
+# source various helper scripts
+_dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$_dotfiles_root/tools/kuse/kuse.sh"
+unset _dotfiles_root

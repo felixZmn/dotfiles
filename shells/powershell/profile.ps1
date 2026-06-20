@@ -1,8 +1,18 @@
-# ============================================================================
-# Git-Aware Prompt
-# ============================================================================
-# Displays branch, commit status (ahead/behind), staged files, and modifications
-# Uses git status --porcelain=v2 for efficiency
+function Get-KubeContext {
+    $ctx = & k config current-context 2>$null
+
+    if ($LASTEXITCODE -ne 0) {
+        return $null
+    }
+
+    $ctx = ($ctx -join "`n").Trim()
+
+    if ([string]::IsNullOrWhiteSpace($ctx)) {
+        return $null
+    }
+
+    return $ctx
+}
 
 function Get-GitStatus {
     $statusOutput = git status --porcelain=v2 --branch 2>$null
@@ -83,20 +93,29 @@ function Get-GitStatus {
 
 function prompt {
     $gitStatus = Get-GitStatus
+    $kubeContext = Get-KubeContext
 
-    # 1. Write the Path (Cyan)
+    # 1. Write the Path
     Write-Host "PS $((Get-Location).Path)" -NoNewline -ForegroundColor Cyan
 
+    # 2. Write Kubernetes context
+    # Leading space, no trailing space, so spacing stays consistent.
+    if ($kubeContext) {
+        Write-Host " [☸ $kubeContext]" -NoNewline -ForegroundColor Blue
+    }
+
     if ($gitStatus) {
-        # 2. Write the Branch Name (Yellow)
+        # 3. Write the Branch Name
+        # Leading space, no trailing space.
         Write-Host " [$($gitStatus.Branch)" -NoNewline -ForegroundColor Yellow
 
-        # 3. Write Up/Down counts
+        # 4. Write Up/Down counts
         if ($gitStatus.Ahead -gt 0) {
             Write-Host " " -NoNewline -ForegroundColor Green
             Write-Host "↑" -NoNewline -ForegroundColor Green
             Write-Host $gitStatus.Ahead -NoNewline -ForegroundColor Green
         }
+
         if ($gitStatus.Behind -gt 0) {
             Write-Host " " -NoNewline -ForegroundColor Red
             Write-Host "↓" -NoNewline -ForegroundColor Red
@@ -105,18 +124,25 @@ function prompt {
 
         Write-Host "]" -NoNewline -ForegroundColor Yellow
 
-        # 4. Write File Changes
+        # 5. Write File Changes
         if ($gitStatus.Staged -gt 0) {
             Write-Host " +$($gitStatus.Staged)" -NoNewline -ForegroundColor Green
         }
+
         if ($gitStatus.Modified -gt 0) {
             Write-Host " ~$($gitStatus.Modified)" -NoNewline -ForegroundColor Red
         }
+
         if ($gitStatus.Untracked -gt 0) {
             Write-Host " ?$($gitStatus.Untracked)" -NoNewline -ForegroundColor Magenta
         }
     }
 
-    # 5. Return the final caret
+    # 6. Return the final prompt marker
     return "> "
 }
+
+# source various helper scripts
+$dotfilesRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+. "$dotfilesRoot\tools\kuse\kuse.ps1"
+Remove-Variable dotfilesRoot
