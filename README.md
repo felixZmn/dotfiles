@@ -103,6 +103,14 @@ dotfiles/
 
 **Customization:** Edit shell color codes in the prompt section (ANSI escape sequences)
 
+**How they're installed:** The installer does **not** overwrite your existing
+shell config. Instead, it appends a small bootstrap block (between the
+`# >>> dotfiles bootstrap >>>` / `# <<< dotfiles bootstrap <<<` sentinels) that
+sources the dotfiles version if it exists. This means your existing aliases,
+`PATH` additions, distro defaults, and prompt tweaks are preserved verbatim;
+the dotfiles content is layered on top. To uninstall, delete the sentinel
+block.
+
 ### Git (.gitconfig)
 
 **Purpose:** Git configuration with signing, tools, and conventional commit hook support
@@ -313,8 +321,3 @@ For issues, questions, or suggestions:
 1. Check [Troubleshooting](#troubleshooting) above
 2. Review docs in `docs/` folder
 3. Check git log for configuration history: `git log --all --oneline`
-
----
-
-**Last Updated:** 2026-06-16  
-**Maintained by:** Felix Zimmermann

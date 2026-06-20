@@ -1,4 +1,4 @@
-# Architecture - Felix's Dotfiles Project Structure
+# Architecture
 
 ## Overview
 
@@ -108,19 +108,38 @@ dotfiles/
 
 ```
 User runs:
-  ./scripts/install.sh
+  ./scripts/install.sh        # Linux/macOS
+  .\scripts\install.ps1       # Windows
 
 Install script:
   1. Detects OS (Linux/macOS/Windows)
   2. Detects shell (bash/zsh/PowerShell)
-  3. For each config file:
-     a. Backup existing at ~/.config (if exists)
-     b. Create symlink: ~/.config → dotfiles/config/path
-  4. Configure git hooks: core.hooksPath = dotfiles/git/hooks/
-  5. Validates prerequisites (git, vim, k9s, etc.)
-  6. Prompts for secrets (email, SSH key) if --ask-secrets
-  7. Shows summary and next steps
+  3. For single-source configs (gitconfig, vimrc, k9s skin):
+     a. Backup existing at $HOME (if exists)
+     b. Create symlink: $HOME/<file> → dotfiles/<file>
+  4. For shell configs (~/.bashrc, ~/.zshrc, $PROFILE):
+     a. If a sentinel (# >>> dotfiles bootstrap >>>) is already present,
+        do nothing (idempotent).
+     b. Otherwise, append a small bootstrap snippet that sources the
+        dotfiles version. User's existing customizations are preserved
+        verbatim; dotfiles content is layered on top.
+  5. Configure git hooks: core.hooksPath = dotfiles/git/hooks/
+  6. Validates prerequisites (git, vim, k9s, etc.)
+  7. Prompts for secrets (email, SSH key) if --ask-secrets
+  8. Shows summary and next steps
 ```
+
+### Why bootstrap for shell configs (and symlink for everything else)
+
+Symlinking works for `~/.gitconfig` and `~/.vimrc` because the dotfiles
+version is the authoritative copy and the user has no reason to extend it
+locally. Shell configs are different: users have years of accumulated
+aliases, `PATH` exports, distro defaults (e.g. Ubuntu's `~/.bashrc`),
+and platform-specific additions that must not be clobbered. The bootstrap
+pattern (a sentinel-guarded `source`/`dot-source` line appended to the
+user's config) is the same approach used by oh-my-zsh, prezto, homeshick,
+and rcm: it layers the dotfiles on top of the user's config rather than
+replacing it.
 
 ## Extensibility Model
 

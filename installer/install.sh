@@ -44,7 +44,7 @@ log_warn() {
 }
 
 log_error() {
-    echo -e "${RED}✗${NC} $*"
+    echo -e "${RED}✗${NC} $*" >&2
 }
 
 backup_existing() {
@@ -52,7 +52,7 @@ backup_existing() {
     if [[ -e "$target" ]]; then
         if [[ "$FORCE" == "true" ]]; then
             log_warn "Removing existing $target (force mode)"
-            rm -f "$target"
+            rm -rf "$target"
         else
             mkdir -p "$BACKUP_DIR"
             log_info "Backing up $target to $BACKUP_DIR/"
@@ -64,13 +64,47 @@ backup_existing() {
 symlink_file() {
     local src=$1
     local dst=$2
-    
+
     backup_existing "$dst"
     mkdir -p "$(dirname "$dst")"
     ln -sf "$src" "$dst"
     log_success "Linked $dst -> $src"
 }
 
+# Append a dotfiles bootstrap snippet to the user's shell config without
+# overwriting it. The snippet is sentinel-guarded, so re-running the
+# installer is safe (idempotent). The user's existing aliases, PATH
+# additions, distro defaults, etc. are preserved verbatim.
+install_shell_bootstrap() {
+    local dst=$1          # e.g. $HOME/.bashrc
+    local snippet=$2      # e.g. $DOTFILES_DIR/shells/bash/.bashrc_dotfiles_snippet
+    local sentinel="# >>> dotfiles bootstrap >>>"
+
+    if [[ ! -f "$snippet" ]]; then
+        log_error "Bootstrap snippet not found: $snippet"
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$dst")"
+    touch "$dst"
+
+    if grep -Fq "$sentinel" "$dst"; then
+        log_info "Bootstrap already present in $dst (skipping)"
+        return 0
+    fi
+
+    # Substitute __DOTFILES_DIR__ with the absolute dotfiles path so the
+    # snippet works regardless of where the user cloned the repo.
+    local rendered
+    rendered=$(sed "s|__DOTFILES_DIR__|$DOTFILES_DIR|g" "$snippet")
+
+    {
+        echo ""
+        echo "$rendered"
+    } >> "$dst"
+
+    log_success "Appended dotfiles bootstrap to $dst"
+}
 # ============================================================================
 # Detect environment
 # ============================================================================
@@ -132,8 +166,10 @@ done
 main() {
     log_info "Starting dotfiles installation..."
     
-    local os=$(detect_os)
-    local shell=$(detect_shell)
+    local os
+    local shell
+    os=$(detect_os)
+    shell=$(detect_shell)
     
     log_info "Detected OS: $os"
     log_info "Detected shell: $shell"
@@ -143,13 +179,18 @@ main() {
     symlink_file "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
     
     # Shell configuration
+    # NOTE: We do NOT symlink ~/.bashrc / ~/.zshrc — that would overwrite any
+    # user customizations (aliases, PATH additions, distro defaults). Instead,
+    # we append a small bootstrap snippet that sources the dotfiles version.
     log_info "Installing shell configuration..."
     case "$shell" in
         zsh)
-            symlink_file "$DOTFILES_DIR/shells/zsh/.zshrc" "$HOME/.zshrc"
+            install_shell_bootstrap "$HOME/.zshrc" \
+                "$DOTFILES_DIR/shells/zsh/.zshrc_dotfiles_snippet" || exit 1
             ;;
         bash)
-            symlink_file "$DOTFILES_DIR/shells/bash/.bashrc" "$HOME/.bashrc"
+            install_shell_bootstrap "$HOME/.bashrc" \
+                "$DOTFILES_DIR/shells/bash/.bashrc_dotfiles_snippet" || exit 1
             ;;
     esac
     
@@ -193,7 +234,7 @@ main() {
     echo
     log_info "Summary:"
     echo "  - Git config: $HOME/.gitconfig"
-    echo "  - Shell config: $HOME/.$([ "$shell" = "zsh" ] && echo "zshrc" || echo "bashrc")"
+    echo "  - Shell config: $HOME/.$([ "$shell" = "zsh" ] && echo "zshrc" || echo "bashrc") (bootstrap appended)"
     echo "  - Vim config: $HOME/.vimrc"
     echo "  - Git hooks: $DOTFILES_DIR/git/hooks"
     
@@ -206,6 +247,10 @@ main() {
     echo "  1. Restart your shell or run: source \$HOME/.$([ "$shell" = "zsh" ] && echo "zshrc" || echo "bashrc")"
     echo "  2. Test git status in a repo: git status"
     echo "  3. (Optional) Configure git email: git config --global user.email 'your.email@example.com'"
+    echo
+    log_info "To uninstall the dotfiles layer, delete the block between"
+    echo "  '# >>> dotfiles bootstrap >>>' and '# <<< dotfiles bootstrap <<<'"
+    echo "  in your shell config."
 }
 
 main
