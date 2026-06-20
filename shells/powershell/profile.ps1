@@ -1,3 +1,9 @@
+Set-Alias k kubectl
+
+# bash-like autocomplete
+Set-PSReadlineKeyHandler -Key Tab -Function Complete
+Set-PSReadlineOption -BellStyle None
+
 function Get-KubeContext {
     $ctx = & k config current-context 2>$null
 

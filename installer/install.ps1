@@ -1,25 +1,40 @@
-# Usage: .\scripts\install.ps1 [-AskSecrets] [-Force] [-Verbose]
-# Requirements: PowerShell 5.1+
+# Usage: .\scripts\install.ps1 [-AskSecrets] [-Force] [-TargetUser <username>] [-Verbose]
+# Requirements: PowerShell 5.1+ (No Admin rights required!)
 
 [CmdletBinding()]
 param(
     [switch]$AskSecrets,
     [switch]$Force,
+    [string]$TargetUser 
 )
 
 $ErrorActionPreference = "Stop"
-$InformationPreference = if ($Verbose) { "Continue" } else { "SilentlyContinue" }
+$InformationPreference = if ($PSBoundParameters.ContainsKey('Verbose')) { "Continue" } else { "SilentlyContinue" }
 
 # ============================================================================
-# Configuration
+# Configuration & Context Resolution
 # ============================================================================
 $DotfilesDir = Split-Path -Parent $PSScriptRoot
 $BackupDir = Join-Path $env:USERPROFILE ".dotfiles-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-# Use $PROFILE directly (the actual loadable profile path, e.g.
-# Microsoft.PowerShell_profile.ps1). The previous code computed $ProfileDir
-# from $PROFILE but then wrote a hardcoded "profile.ps1" that PowerShell
-# never loaded.
-$ProfilePath = if ($PROFILE) { $PROFILE } else { Join-Path $env:USERPROFILE "Documents\PowerShell\Microsoft.PowerShell_profile.ps1" }
+
+# If running elevated as a different admin user, resolve the target user's paths
+if ($TargetUser) {
+    Write-Host "Resolving profile for target user: $TargetUser..." -ForegroundColor Magenta
+    try {
+        $sid = (New-Object System.Security.Principal.NTAccount($TargetUser)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+        $resolvedProfilePath = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid" -ErrorAction Stop).ProfileImagePath
+        $env:USERPROFILE = $resolvedProfilePath
+    } catch {
+        Write-Host "Could not resolve via registry, falling back to standard path." -ForegroundColor Yellow
+        $env:USERPROFILE = "C:\Users\$TargetUser"
+    }
+}
+
+$ProfilePath = if ($PROFILE -and -not $TargetUser) { 
+    $PROFILE 
+} else { 
+    Join-Path $env:USERPROFILE "Documents\PowerShell\Microsoft.PowerShell_profile.ps1" 
+}
 
 # ============================================================================
 # Helper functions
@@ -62,7 +77,13 @@ function Backup-File {
     }
 }
 
-function New-SymLink {
+function New-SmartLink {
+    <#
+    .SYNOPSIS
+    Creates links WITHOUT requiring Admin rights.
+    Uses Hardlinks for files, and Junctions for directories.
+    Falls back to Copy if Hardlink fails (e.g., cross-volume).
+    #>
     param(
         [string]$SourcePath,
         [string]$TargetPath
@@ -75,29 +96,29 @@ function New-SymLink {
         New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
     }
 
-    New-Item -ItemType SymbolicLink -Path $TargetPath -Target $SourcePath -Force | Out-Null
-    Write-Log "Linked $TargetPath -> $SourcePath" "Success"
-}
+    $isDir = (Get-Item $SourcePath).PSIsContainer
 
-function Test-SymLinkSupport {
-    try {
-        $tmp = Join-Path $env:TEMP "dotfiles_symlink_test"
-        New-Item -ItemType SymbolicLink -Path $tmp -Target $env:TEMP -Force -ErrorAction Stop | Out-Null
-        Remove-Item $tmp -Force
-        return $true
-    } catch {
-        return $false
+    if ($isDir) {
+        # Junctions do not require admin rights and work across volumes
+        New-Item -ItemType Junction -Path $TargetPath -Target $SourcePath -Force | Out-Null
+        Write-Log "Linked (Junction) $TargetPath -> $SourcePath" "Success"
+    } else {
+        try {
+            # Hardlinks do not require admin rights (same volume only)
+            New-Item -ItemType HardLink -Path $TargetPath -Target $SourcePath -Force -ErrorAction Stop | Out-Null
+            Write-Log "Linked (Hardlink) $TargetPath -> $SourcePath" "Success"
+        } catch {
+            # Fallback for cross-volume drives (e.g. Dotfiles on C:, User on D:)
+            Copy-Item -Path $SourcePath -Destination $TargetPath -Force
+            Write-Log "Copied (Hardlink failed/cross-volume) $TargetPath <- $SourcePath" "Warn"
+        }
     }
 }
 
-# Append a dotfiles bootstrap snippet to the user's PowerShell profile without
-# overwriting it. The snippet is sentinel-guarded, so re-running the installer
-# is safe (idempotent). The user's existing profile content is preserved
-# verbatim; the dotfiles version is dot-sourced on top.
 function Install-ShellBootstrap {
     param(
-        [string]$TargetPath,   # e.g. $PROFILE
-        [string]$SnippetPath   # e.g. dotfiles/shells/powershell/profile_dotfiles_snippet.ps1
+        [string]$TargetPath,
+        [string]$SnippetPath
     )
 
     $sentinel = "# >>> dotfiles bootstrap >>>"
@@ -121,17 +142,16 @@ function Install-ShellBootstrap {
         return
     }
 
-    # Substitute __DOTFILES_DIR__ with the absolute dotfiles path so the
-    # snippet works regardless of where the user cloned the repo.
-    $rendered = Get-Content -Path $SnippetPath -Raw `
-        -ErrorAction SilentlyContinue
+    $rendered = Get-Content -Path $SnippetPath -Raw -ErrorAction SilentlyContinue
     if ($null -eq $rendered) {
         Write-Log "Bootstrap snippet is empty: $SnippetPath" "Error"
         return
     }
     $rendered = $rendered.Replace('__DOTFILES_DIR__', $DotfilesDir)
-
-    A$rendered = $rendered -replace "`r`n", "`n"
+    
+    # FIXED TYPO: Removed the stray 'A' from A$rendered
+    $rendered = $rendered -replace "`r`n", "`n"
+    
     [System.IO.File]::AppendAllText($TargetPath, "`n$rendered")
     Write-Log "Appended dotfiles bootstrap to $TargetPath" "Success"
 }
@@ -140,24 +160,17 @@ function Install-ShellBootstrap {
 # Main installation
 # ============================================================================
 function Install-Dotfiles {
-    if (-not (Test-SymLinkSupport)) {
-        Write-Log "Symlinks require Administrator rights or Developer Mode. Re-run as Administrator." "Error"
-        exit 1
-    }
+    # Removed Admin check because Hardlinks/Junctions don't require it!
 
     Write-Log "Starting dotfiles installation..." "Info"
     Write-Log "PowerShell version: $($PSVersionTable.PSVersion)" "Info"
+    Write-Log "Installing to User Profile: $env:USERPROFILE" "Info"
     
     # Git configuration
     Write-Log "Installing git configuration..." "Info"
-    New-SymLink -SourcePath (Join-Path $DotfilesDir "git\.gitconfig") -TargetPath (Join-Path $env:USERPROFILE ".gitconfig")
+    New-SmartLink -SourcePath (Join-Path $DotfilesDir "git\.gitconfig") -TargetPath (Join-Path $env:USERPROFILE ".gitconfig")
     
     # PowerShell profile
-    # NOTE: We do NOT symlink $PROFILE — that would overwrite any user
-    # customizations. Instead, we append a small bootstrap snippet that
-    # dot-sources the dotfiles version. Also: target $PROFILE directly so
-    # PowerShell actually loads it (the previous code wrote a hardcoded
-    # "profile.ps1" that was never sourced).
     Write-Log "Installing PowerShell profile..." "Info"
     Install-ShellBootstrap `
         -TargetPath $ProfilePath `
@@ -166,7 +179,7 @@ function Install-Dotfiles {
     # Vim configuration (if available)
     if ((Get-Command vim -ErrorAction SilentlyContinue) -or (Get-Command nvim -ErrorAction SilentlyContinue)) {
         Write-Log "Installing vim configuration..." "Info"
-        New-SymLink -SourcePath (Join-Path $DotfilesDir "vim\.vimrc") -TargetPath (Join-Path $env:USERPROFILE ".vimrc")
+        New-SmartLink -SourcePath (Join-Path $DotfilesDir "vim\.vimrc") -TargetPath (Join-Path $env:USERPROFILE ".vimrc")
     } else {
         Write-Log "Vim not found, skipping vim configuration" "Warn"
     }
@@ -182,7 +195,7 @@ function Install-Dotfiles {
         Write-Log "Installing k9s skin..." "Info"
         $k9sDir = Join-Path $env:APPDATA "k9s\skins"
         New-Item -ItemType Directory -Path $k9sDir -Force | Out-Null
-        New-SymLink -SourcePath (Join-Path $DotfilesDir "tools\k9s\skin.yaml") -TargetPath (Join-Path $k9sDir "catppuccin-custom.yaml")
+        New-SmartLink -SourcePath (Join-Path $DotfilesDir "tools\k9s\skin.yaml") -TargetPath (Join-Path $k9sDir "catppuccin-custom.yaml")
     } else {
         Write-Log "k9s not found, skipping k9s configuration" "Warn"
     }
