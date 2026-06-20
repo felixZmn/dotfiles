@@ -5,7 +5,6 @@
 # Options:
 #   --ask-secrets    Prompt for git email and SSH key path
 #   --force          Overwrite existing configs without backup
-#   --zsh            Use zsh instead of bash (default: auto-detect)
 #   --bash           Force bash (default: auto-detect)
 
 set -euo pipefail
@@ -179,15 +178,8 @@ main() {
     symlink_file "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
     
     # Shell configuration
-    # NOTE: We do NOT symlink ~/.bashrc / ~/.zshrc — that would overwrite any
-    # user customizations (aliases, PATH additions, distro defaults). Instead,
-    # we append a small bootstrap snippet that sources the dotfiles version.
     log_info "Installing shell configuration..."
     case "$shell" in
-        zsh)
-            install_shell_bootstrap "$HOME/.zshrc" \
-                "$DOTFILES_DIR/shells/zsh/.zshrc_dotfiles_snippet" || exit 1
-            ;;
         bash)
             install_shell_bootstrap "$HOME/.bashrc" \
                 "$DOTFILES_DIR/shells/bash/.bashrc_dotfiles_snippet" || exit 1
