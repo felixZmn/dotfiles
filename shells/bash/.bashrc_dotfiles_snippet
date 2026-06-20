@@ -1,0 +1,11 @@
+# >>> dotfiles bootstrap >>>
+# Source the dotfiles bash config if it exists. This block is appended by
+# scripts/install.sh and is idempotent (re-running the installer is safe).
+# To uninstall, delete this block.
+if [ -f "__DOTFILES_DIR__/shells/bash/.bashrc" ] && \
+   [ "${DOTFILES_BASH_LOADED:-}" != "1" ]; then
+    export DOTFILES_BASH_LOADED=1
+    # shellcheck disable=SC1090
+    source "__DOTFILES_DIR__/shells/bash/.bashrc"
+fi
+# <<< dotfiles bootstrap <<<

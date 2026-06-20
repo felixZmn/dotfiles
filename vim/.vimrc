@@ -1,6 +1,4 @@
 " .vimrc - Vim configuration file
-" Part of Felix's dotfiles repository
-" For more info, see docs/SHELL_CONFIG.md
 
 " ============================================================================
 " Plugins (vim-plug)
