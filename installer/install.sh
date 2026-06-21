@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# install.sh - Cross-platform installer for Felix's dotfiles
 # Usage: ./scripts/install.sh [OPTIONS]
 # Options:
 #   --ask-secrets    Prompt for git email and SSH key path
 #   --force          Overwrite existing configs without backup
-#   --bash           Force bash (default: auto-detect)
 
 set -euo pipefail
 
@@ -16,7 +14,6 @@ DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="${HOME}/.dotfiles-backup-$(date +%s)"
 FORCE=false
 ASK_SECRETS=false
-SHELL_CHOICE=""
 
 # ============================================================================
 # Colors for output
@@ -46,17 +43,36 @@ log_error() {
     echo -e "${RED}✗${NC} $*" >&2
 }
 
+# Returns the shell rc file path for a given shell name
+get_rc_file() {
+    case "$1" in
+        bash) echo "$HOME/.bashrc" ;;
+        *)    echo "$HOME/.bashrc" ;;
+    esac
+}
+
 backup_existing() {
     local target=$1
-    if [[ -e "$target" ]]; then
-        if [[ "$FORCE" == "true" ]]; then
-            log_warn "Removing existing $target (force mode)"
-            rm -rf "$target"
-        else
-            mkdir -p "$BACKUP_DIR"
-            log_info "Backing up $target to $BACKUP_DIR/"
-            cp -r "$target" "$BACKUP_DIR/$(basename "$target")"
-        fi
+
+    # Nothing to do if the target does not exist
+    [[ -e "$target" ]] || return 0
+
+    # If it is already one of our own symlinks, leave it alone
+    if [[ -L "$target" ]] && [[ "$(readlink -f "$target")" == "$DOTFILES_DIR"* ]]; then
+        log_info "Already managed symlink, skipping backup: $target"
+        return 0
+    fi
+
+    if [[ "$FORCE" == "true" ]]; then
+        log_warn "Removing existing $target (force mode)"
+        rm -rf "$target"
+    else
+        mkdir -p "$BACKUP_DIR"
+        log_info "Backing up $target to $BACKUP_DIR/"
+        cp -r "$target" "$BACKUP_DIR/$(basename "$target")"
+        # Remove original so ln -sf replaces it cleanly (a directory target
+        # would otherwise cause the symlink to be created *inside* it)
+        rm -rf "$target"
     fi
 }
 
@@ -104,6 +120,7 @@ install_shell_bootstrap() {
 
     log_success "Appended dotfiles bootstrap to $dst"
 }
+
 # ============================================================================
 # Detect environment
 # ============================================================================
@@ -117,18 +134,18 @@ detect_os() {
 }
 
 detect_shell() {
-    if [[ "$SHELL_CHOICE" != "" ]]; then
-        echo "$SHELL_CHOICE"
-        return
-    fi
-    
-    if [[ "$SHELL" == *"zsh"* ]]; then
-        echo "zsh"
-    elif [[ "$SHELL" == *"bash"* ]]; then
-        echo "bash"
-    else
-        echo "bash" # default
-    fi
+    local current_shell
+    current_shell=$(ps -p $$ -o comm= 2>/dev/null || echo "bash")
+    # ps may prefix the name with a dash for login shells (e.g. -bash)
+    current_shell="${current_shell#-}"
+
+    case "$current_shell" in
+        bash) echo "bash" ;;
+        *)
+            log_warn "Unsupported shell '$current_shell', defaulting to bash"
+            echo "bash"
+            ;;
+    esac
 }
 
 # ============================================================================
@@ -144,14 +161,6 @@ while [[ $# -gt 0 ]]; do
             FORCE=true
             shift
             ;;
-        --zsh)
-            SHELL_CHOICE="zsh"
-            shift
-            ;;
-        --bash)
-            SHELL_CHOICE="bash"
-            shift
-            ;;
         *)
             log_error "Unknown option: $1"
             exit 1
@@ -164,37 +173,35 @@ done
 # ============================================================================
 main() {
     log_info "Starting dotfiles installation..."
-    
+
     local os
     local shell
+    local rc_file
     os=$(detect_os)
     shell=$(detect_shell)
-    
+    rc_file=$(get_rc_file "$shell")
+
     log_info "Detected OS: $os"
     log_info "Detected shell: $shell"
-    
+
     # Git configuration
     log_info "Installing git configuration..."
     symlink_file "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
-    
+
     # Shell configuration
     log_info "Installing shell configuration..."
-    case "$shell" in
-        bash)
-            install_shell_bootstrap "$HOME/.bashrc" \
-                "$DOTFILES_DIR/shells/bash/.bashrc_dotfiles_snippet" || exit 1
-            ;;
-    esac
-    
+    install_shell_bootstrap "$rc_file" \
+        "$DOTFILES_DIR/shells/bash/.bashrc_dotfiles_snippet" || exit 1
+
     # Vim configuration
     log_info "Installing vim configuration..."
     symlink_file "$DOTFILES_DIR/vim/.vimrc" "$HOME/.vimrc"
-    
+
     # Git hooks
     log_info "Configuring git hooks..."
     git config --global core.hooksPath "$DOTFILES_DIR/git/hooks"
     log_success "Git hooks configured via core.hooksPath"
-    
+
     # k9s configuration (if k9s is installed)
     if command -v k9s &> /dev/null; then
         log_info "Installing k9s skin..."
@@ -203,40 +210,46 @@ main() {
     else
         log_warn "k9s not found, skipping k9s configuration"
     fi
-    
+
     # Interactive prompt for secrets (optional)
     if [[ "$ASK_SECRETS" == "true" ]]; then
         log_info "Configuring git user settings..."
-        
-        read -p "Git user email (current: $(git config user.email || 'not set')): " -r email
+
+        local current_email current_key email signing_key
+
+        current_email=$(git config --global user.email 2>/dev/null || echo "not set")
+        printf "Git user email (current: %s): " "$current_email"
+        read -r email
         if [[ -n "$email" ]]; then
             git config --global user.email "$email"
             log_success "Git email set to: $email"
         fi
-        
-        read -p "SSH signing key path (current: $(git config user.signingKey || 'not set')): " -r signingKey
-        if [[ -n "$signingKey" ]]; then
-            git config --global user.signingKey "$signingKey"
-            log_success "SSH signing key set to: $signingKey"
+
+        current_key=$(git config --global user.signingKey 2>/dev/null || echo "not set")
+        printf "SSH signing key path (current: %s): " "$current_key"
+        read -r signing_key
+        if [[ -n "$signing_key" ]]; then
+            git config --global user.signingKey "$signing_key"
+            log_success "SSH signing key set to: $signing_key"
         fi
     fi
-    
+
     echo
     log_success "Installation complete!"
     echo
     log_info "Summary:"
     echo "  - Git config: $HOME/.gitconfig"
-    echo "  - Shell config: $HOME/.$([ "$shell" = "zsh" ] && echo "zshrc" || echo "bashrc") (bootstrap appended)"
+    echo "  - Shell config: $rc_file (bootstrap appended)"
     echo "  - Vim config: $HOME/.vimrc"
     echo "  - Git hooks: $DOTFILES_DIR/git/hooks"
-    
+
     if [[ -d "$BACKUP_DIR" ]]; then
         echo "  - Backups: $BACKUP_DIR"
     fi
-    
+
     echo
     log_info "Next steps:"
-    echo "  1. Restart your shell or run: source \$HOME/.$([ "$shell" = "zsh" ] && echo "zshrc" || echo "bashrc")"
+    echo "  1. Restart your shell or run: source $rc_file"
     echo "  2. Test git status in a repo: git status"
     echo "  3. (Optional) Configure git email: git config --global user.email 'your.email@example.com'"
     echo
