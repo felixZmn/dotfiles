@@ -115,18 +115,35 @@ function New-SmartLink {
     }
 }
 
+function Get-RenderedBootstrap {
+    param([string]$SnippetPath)
+
+    if (-not (Test-Path $SnippetPath)) {
+        Write-Log "Bootstrap snippet not found: $SnippetPath" "Error"
+        throw "Bootstrap snippet not found: $SnippetPath"
+    }
+
+    $rendered = Get-Content -Path $SnippetPath -Raw -ErrorAction SilentlyContinue
+    if ($null -eq $rendered) {
+        Write-Log "Bootstrap snippet is empty: $SnippetPath" "Error"
+        throw "Bootstrap snippet is empty: $SnippetPath"
+    }
+
+    $rendered = $rendered.Replace('__DOTFILES_DIR__', $DotfilesDir)
+    return ($rendered -replace "`r`n", "`n").TrimEnd()
+}
+
 function Install-ShellBootstrap {
     param(
         [string]$TargetPath,
         [string]$SnippetPath
     )
 
-    $sentinel = "# >>> dotfiles bootstrap >>>"
+    $sentinelStart = "# >>> dotfiles bootstrap >>>"
+    $sentinelEnd = "# <<< dotfiles bootstrap <<<"
+    $bootstrapBlockPattern = "(?s)\r?\n# >>> dotfiles bootstrap >>>.*?# <<< dotfiles bootstrap <<<"
 
-    if (-not (Test-Path $SnippetPath)) {
-        Write-Log "Bootstrap snippet not found: $SnippetPath" "Error"
-        throw "Bootstrap snippet not found: $SnippetPath"
-    }
+    $rendered = Get-RenderedBootstrap -SnippetPath $SnippetPath
 
     $targetDir = Split-Path -Parent $TargetPath
     if (-not (Test-Path $targetDir)) {
@@ -137,22 +154,14 @@ function Install-ShellBootstrap {
     }
 
     $existing = Get-Content -Path $TargetPath -Raw -ErrorAction SilentlyContinue
-    if ($existing -and $existing.Contains($sentinel)) {
-        Write-Log "Bootstrap already present in $TargetPath (skipping)" "Info"
+    if ($existing -and $existing.Contains($sentinelStart)) {
+        $updated = [regex]::Replace($existing, $bootstrapBlockPattern, "`n$rendered")
+        [System.IO.File]::WriteAllText($TargetPath, $updated.TrimEnd() + "`n")
+        Write-Log "Updated dotfiles bootstrap in $TargetPath" "Success"
         return
     }
 
-    $rendered = Get-Content -Path $SnippetPath -Raw -ErrorAction SilentlyContinue
-    if ($null -eq $rendered) {
-        Write-Log "Bootstrap snippet is empty: $SnippetPath" "Error"
-        return
-    }
-    $rendered = $rendered.Replace('__DOTFILES_DIR__', $DotfilesDir)
-    
-    # FIXED TYPO: Removed the stray 'A' from A$rendered
-    $rendered = $rendered -replace "`r`n", "`n"
-    
-    [System.IO.File]::AppendAllText($TargetPath, "`n$rendered")
+    [System.IO.File]::AppendAllText($TargetPath, "`n$rendered`n")
     Write-Log "Appended dotfiles bootstrap to $TargetPath" "Success"
 }
 
@@ -170,11 +179,10 @@ function Install-Dotfiles {
     Write-Log "Installing git configuration..." "Info"
     New-SmartLink -SourcePath (Join-Path $DotfilesDir "git\.gitconfig") -TargetPath (Join-Path $env:USERPROFILE ".gitconfig")
     
-    # PowerShell profile
+    # PowerShell profile (all-hosts — works in Console, VS Code, Cursor, etc.)
     Write-Log "Installing PowerShell profile..." "Info"
-    Install-ShellBootstrap `
-        -TargetPath $ProfilePath `
-        -SnippetPath (Join-Path $DotfilesDir "shells\powershell\profile_dotfiles_snippet.ps1")
+    $snippetPath = Join-Path $DotfilesDir "shells\powershell\profile_dotfiles_snippet.ps1"
+    Install-ShellBootstrap -TargetPath $ProfilePath -SnippetPath $snippetPath
     
     # Vim configuration (if available)
     if ((Get-Command vim -ErrorAction SilentlyContinue) -or (Get-Command nvim -ErrorAction SilentlyContinue)) {

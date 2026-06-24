@@ -1,5 +1,20 @@
+# -- Git status cache ---------------------------------------------------------
+_git_cache=""
+_git_cache_dir=""
+_git_cache_time=0
+
 git_info() {
-    git status --porcelain=v2 --branch 2>/dev/null | awk '
+    local now cwd result
+    cwd="$PWD"
+    now=$(date +%s)
+
+    # Return cached result if we're in the same directory and cache is fresh.
+    if [[ "$cwd" == "$_git_cache_dir" && $(( now - _git_cache_time )) -lt 5 ]]; then
+        printf "%s" "$_git_cache"
+        return
+    fi
+
+    result=$(git status --porcelain=v2 --branch 2>/dev/null | awk '
     /^# branch.head/ { b=$3 }
     /^# branch.ab/   { a=$3; d=$4 }
     # Check for Modified/Untracked/Unmerged
@@ -31,13 +46,26 @@ git_info() {
         
         # Reset
         printf "\001\033[0m\002"
-    }'
+    }')
+
+    # Cache result — including empty string, so we don't retry outside git repos.
+    _git_cache="$result"
+    _git_cache_dir="$cwd"
+    _git_cache_time="$now"
+
+    printf "%s" "$result"
 }
 
 kube_info() {
-    local ctx
+    local kubeconfig_path ctx
 
-    ctx=$(kubectl config current-context 2>/dev/null) || return 0
+    # Mirror kuse.sh's logic: honour $KUBECONFIG, fall back to default.
+    kubeconfig_path="${KUBECONFIG:-$HOME/.kube/config}"
+
+    [[ -f "$kubeconfig_path" ]] || return 0
+
+    ctx=$(grep -m1 "^current-context:" "$kubeconfig_path" \
+          | sed 's/^current-context:[[:space:]]*//')
 
     [[ -n "$ctx" ]] || return 0
 

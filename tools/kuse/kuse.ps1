@@ -101,7 +101,7 @@ function Find-KubeConfig {
 
 function Get-KubeCurrentContext {
     $ctx = & kubectl config current-context 2>$null
-    return if ($ctx) { $ctx.Trim() } else { "(none)" }
+    return $(if ($ctx) { $ctx.Trim() } else { "(none)" })
 }
 
 function Get-KubeAllContexts {
@@ -157,7 +157,7 @@ function Show-KubeList {
         if ($f.FullName -eq $env:KUBECONFIG) {
             Write-KubeColor Green  "  ▶  " -NoNewline
             Write-KubeColor White  $fname -NoNewline
-            Write-KubeColor Yellow "  ← active"
+            Write-KubeColor Yellow "  <- active"
         } else {
             Write-KubeColor Blue "  ◦  " -NoNewline
             Write-Host $fname
@@ -201,14 +201,14 @@ function Reset-KubeConfig {
 }
 
 function Show-KubeHelp {
-    Write-KubeHeader "kuse — kubernetes config switcher"
+    Write-KubeHeader "kuse - kubernetes config switcher"
 
     $entries = @(
-        @{ Cmd = "<name>";       Desc = "activate a kubeconfig" }
-        @{ Cmd = "-l, --list";   Desc = "list all configs (default)" }
-        @{ Cmd = "-c, --current";Desc = "show active config + context" }
-        @{ Cmd = "-r, --reset";  Desc = "switch back to ~/.kube/config" }
-        @{ Cmd = "-h, --help";   Desc = "show this help" }
+        @{ Cmd = "<name>";        Desc = "activate a kubeconfig" }
+        @{ Cmd = "-l, -list";    Desc = "list all configs (default)" }
+        @{ Cmd = "-c, -current"; Desc = "show active config + context" }
+        @{ Cmd = "-r, -reset";   Desc = "switch back to ~/.kube/config" }
+        @{ Cmd = "-h, -help";    Desc = "show this help" }
     )
 
     foreach ($e in $entries) {
