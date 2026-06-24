@@ -77,8 +77,3 @@ userHost="\[\e[1;32m\]\u\[\e[m\]\[\e[1;32m\]@\[\e[m\]\[\e[1;32m\]\h\[\e[m\]"
 path="\[\e[1;34m\]\w\[\e[m\]"
 
 PS1="$userHost:$path\$(kube_info)\$(git_info) \\$ "
-
-# source various helper scripts
-_dotfiles_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-source "$_dotfiles_root/tools/kuse/kuse.sh"
-unset _dotfiles_root

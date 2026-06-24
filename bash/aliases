@@ -1,0 +1,9 @@
+DOTSCRIPTS="$HOME/.local/bin/dotscripts"
+
+# Auto-source all function scripts
+for script in "$DOTSCRIPTS"/*.sh; do
+  [ -f "$script" ] && source "$script"
+done
+
+# Add executables to PATH
+export PATH="$DOTSCRIPTS/bin:$PATH"
