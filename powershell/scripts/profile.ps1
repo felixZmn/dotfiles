@@ -172,5 +172,5 @@ function prompt {
 
 # source various helper scripts
 $dotfilesRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-. "$dotfilesRoot\tools\kuse\kuse.ps1"
+. "$dotfilesRoot\powershell\scripts\kuse.ps1"
 Remove-Variable dotfilesRoot

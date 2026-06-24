@@ -33,7 +33,7 @@ function InjectProfile($profilePath, $dotfilesAliases) {
     $content = Get-Content $profilePath -Raw
 
     if ($content -notmatch [regex]::Escape($marker)) {
-        Add-Content $profilePath n$markern. "$dotfilesAliases"`n# <<< dotfiles <<<"
+        Add-Content $profilePath "`n$marker`n. `"$dotfilesAliases`"`n# <<< dotfiles <<<"
         Write-Host "  Updated PowerShell profile"
     } else {
         Write-Host "  Profile already configured, skipping"
