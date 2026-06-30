@@ -1,0 +1,19 @@
+#!/bin/sh
+
+BRANCH=$(git symbolic-ref --short HEAD)
+
+if [ "$BRANCH" = "main" ]; then
+  echo "⚠️  WARNING: You are about to commit directly to 'main'!"
+  echo ""
+  printf "Are you sure you want to do this? (y/N): "
+  read CONFIRM < /dev/tty
+
+  if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
+    echo "❌ Commit aborted."
+    exit 1
+  fi
+
+  echo "✅ Proceeding with commit to main..."
+fi
+
+exit 0
