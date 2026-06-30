@@ -25,17 +25,34 @@ function DeployDir($srcDir, $destDir) {
 
 function InjectProfile($profilePath, $dotfilesAliases) {
     $marker = "# >>> dotfiles >>>"
+    $parent = Split-Path $profilePath
+
+    if (!(Test-Path $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
 
     if (!(Test-Path $profilePath)) {
         New-Item -Path $profilePath -ItemType File -Force | Out-Null
     }
 
-    $content = Get-Content $profilePath -Raw
+    # Get-Content -Raw returns $null on empty files; $null -notmatch is $false and skips injection.
+    $content = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue
+    if ($null -eq $content) { $content = "" }
 
     if ($content -notmatch [regex]::Escape($marker)) {
-        Add-Content $profilePath "`n$marker`n. `"$dotfilesAliases`"`n# <<< dotfiles <<<"
-        Write-Host "  Updated PowerShell profile"
+        $block = @"
+
+$marker
+. "$dotfilesAliases"
+# <<< dotfiles <<<
+"@
+        if ($content.Trim().Length -eq 0) {
+            Set-Content -Path $profilePath -Value $block.TrimStart() -NoNewline
+        } else {
+            Add-Content -Path $profilePath -Value $block
+        }
+        Write-Host "  Updated PowerShell profile: $profilePath"
     } else {
-        Write-Host "  Profile already configured, skipping"
+        Write-Host "  Profile already configured, skipping: $profilePath"
     }
 }

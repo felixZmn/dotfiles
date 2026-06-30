@@ -4,11 +4,6 @@ Set-Alias k kubectl
 Set-PSReadlineKeyHandler -Key Tab -Function Complete
 Set-PSReadlineOption -BellStyle None
 
-# -- Git status cache ---------------------------------------------------------
-$script:_GitCache    = $null
-$script:_GitCacheDir = ""
-$script:_GitCacheAge = [datetime]::MinValue
-
 function Get-KubeContext {
     # Resolve which kubeconfig is active — identical logic to kuse.ps1.
     # Reading a text file is ~1ms vs. ~200ms for spawning kubectl.
@@ -36,24 +31,9 @@ function Get-KubeContext {
 }
 
 function Get-GitStatus {
-    $cwd = (Get-Location).Path
-    $now = [datetime]::UtcNow
-
-    # Return cached result if we're in the same directory and cache is fresh.
-    if (
-        $script:_GitCacheDir -eq $cwd -and
-        ($now - $script:_GitCacheAge).TotalSeconds -lt 5
-    ) {
-        return $script:_GitCache
-    }
-
     $statusOutput = git status --porcelain=v2 --branch 2>$null
 
-    # Cache a $null result too, so we don't keep retrying outside git repos.
     if ($null -eq $statusOutput) {
-        $script:_GitCache = $null
-        $script:_GitCacheDir = $cwd
-        $script:_GitCacheAge = $now
         return $null
     }
 
@@ -105,7 +85,7 @@ function Get-GitStatus {
         }
     }
 
-    $result = @{
+    return @{
         RepoName   = Split-Path -Leaf $PWD
         Branch     = $branchName
         Hash       = $commitHash
@@ -117,56 +97,56 @@ function Get-GitStatus {
         Untracked  = $untracked
         HasChanges = ($staged + $modified + $untracked) -gt 0
     }
+}
 
-    $script:_GitCache    = $result
-    $script:_GitCacheDir = $cwd
-    $script:_GitCacheAge = $now
-
-    return $result
+function Write-PromptPart {
+    param(
+        [string]$Text,
+        [string]$Ansi  # SGR params, e.g. '1;34' — matches bash prompt.sh
+    )
+    $esc = [char]27
+    Write-Host "${esc}[$Ansi`m$Text${esc}[0m" -NoNewline
 }
 
 function prompt {
     $gitStatus = Get-GitStatus
     $kubeContext = Get-KubeContext
 
-    # 1. Write the Path
-    Write-Host "PS $((Get-Location).Path)" -NoNewline -ForegroundColor Cyan
+    # Path — bold blue (1;34), like bash \w
+    Write-PromptPart "PS $((Get-Location).Path)" '1;34'
 
-    # 2. Write Kubernetes context
+    # Kubernetes — bold cyan (1;36), like bash kube_info
     if ($kubeContext) {
-        Write-Host " [☸ $kubeContext]" -NoNewline -ForegroundColor Blue
+        Write-PromptPart " [☸ $kubeContext]" '1;36'
     }
 
     if ($gitStatus) {
-        # 3. Write the Branch Name
-        Write-Host " [$($gitStatus.Branch)" -NoNewline -ForegroundColor Yellow
+        # Branch — bold yellow (1;33)
+        Write-PromptPart " [$($gitStatus.Branch)" '1;33'
 
-        # 4. Write Up/Down counts
         if ($gitStatus.Ahead -gt 0) {
-            Write-Host " ↑$($gitStatus.Ahead)" -NoNewline -ForegroundColor Green
+            Write-PromptPart " ↑$($gitStatus.Ahead)" '1;32'
         }
 
         if ($gitStatus.Behind -gt 0) {
-            Write-Host " ↓$($gitStatus.Behind)" -NoNewline -ForegroundColor Red
+            Write-PromptPart " ↓$($gitStatus.Behind)" '1;31'
         }
 
-        Write-Host "]" -NoNewline -ForegroundColor Yellow
+        Write-PromptPart ']' '1;33'
 
-        # 5. Write File Changes
         if ($gitStatus.Staged -gt 0) {
-            Write-Host " +$($gitStatus.Staged)" -NoNewline -ForegroundColor Green
+            Write-PromptPart " +$($gitStatus.Staged)" '1;32'
         }
 
         if ($gitStatus.Modified -gt 0) {
-            Write-Host " ~$($gitStatus.Modified)" -NoNewline -ForegroundColor Red
+            Write-PromptPart " ~$($gitStatus.Modified)" '1;31'
         }
 
         if ($gitStatus.Untracked -gt 0) {
-            Write-Host " ?$($gitStatus.Untracked)" -NoNewline -ForegroundColor Magenta
+            Write-PromptPart " ?$($gitStatus.Untracked)" '35'
         }
     }
 
-    # 6. Return the final prompt marker
     return "> "
 }
 

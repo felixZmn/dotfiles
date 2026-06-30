@@ -1,57 +1,70 @@
-# -- Git status cache ---------------------------------------------------------
-_git_cache=""
-_git_cache_dir=""
-_git_cache_time=0
-
 git_info() {
-    local now cwd result
-    cwd="$PWD"
-    now=$(date +%s)
+    local status_output result
+    status_output=$(git status --porcelain=v2 --branch 2>/dev/null)
 
-    # Return cached result if we're in the same directory and cache is fresh.
-    if [[ "$cwd" == "$_git_cache_dir" && $(( now - _git_cache_time )) -lt 5 ]]; then
-        printf "%s" "$_git_cache"
-        return
+    [[ -n "$status_output" ]] || return
+
+    local branch_name="" ahead=0 behind=0 staged=0 modified=0 untracked=0
+    local line char
+    local R=$'\001' N=$'\002' E=$'\033'  # \[, \], and ESC for PS0
+
+    # Parse porcelain=v2 output — mirrors Get-GitStatus in profile.ps1.
+    while IFS= read -r line; do
+        if [[ "$line" == \#* ]]; then
+            if [[ "$line" =~ ^#\ branch\.head\ (.*)$ ]]; then
+                branch_name="${BASH_REMATCH[1]}"
+            elif [[ "$line" =~ ^#\ branch\.ab\ \+([0-9]+)\ -([0-9]+) ]]; then
+                ahead="${BASH_REMATCH[1]}"
+                behind="${BASH_REMATCH[2]}"
+            fi
+        else
+            char="${line:0:1}"
+
+            if [[ "$char" == "?" ]]; then
+                ((untracked++)) || true
+            elif [[ "$char" == "u" ]]; then
+                ((modified++)) || true
+            elif [[ "$char" == "1" || "$char" == "2" ]]; then
+                [[ "${line:2:1}" != "." ]] && ((staged++)) || true
+                [[ "${line:3:1}" != "." ]] && ((modified++)) || true
+            fi
+        fi
+    done <<< "$status_output"
+
+    result=""
+
+    # Branch name — bold yellow (1;33)
+    result+="${R}${E}[1;33m${N} [${branch_name}"
+
+    # Ahead — bold green (1;32)
+    if (( ahead > 0 )); then
+        result+=" ${R}${E}[1;32m${N}↑${ahead}"
     fi
 
-    result=$(git status --porcelain=v2 --branch 2>/dev/null | awk '
-    /^# branch.head/ { b=$3 }
-    /^# branch.ab/   { a=$3; d=$4 }
-    # Check for Modified/Untracked/Unmerged
-    /^[\?u]/         { w=1 }
-    /^[12]/          { 
-                       if($2 ~ /^[^.]/) s++; # Staged count
-                       if($2 ~ /.[^.]/) w=1; # Unstaged flag
-                     }
-    END {
-        if(!b) exit
-        
-        # Branch: Bold Yellow (1;33)
-        printf "\001\033[1;33m\002 [%s", b
-        
-        # Ahead: Bold Green (1;32)
-        if(a>0) printf " \001\033[1;32m\002↑%d", a
-        
-        # Behind: Bold Red (1;31)
-        if(d<0) printf " \001\033[1;31m\002↓%d", d*-1
-        
-        # Close Bracket: Bold Yellow (1;33)
-        printf "\001\033[1;33m\002]"
-        
-        # Staged: Bold Green (1;32)
-        if(s) printf " \001\033[1;32m\002+%d", s
-        
-        # Dirty (Any unstaged change): Bold Red (1;31)
-        if(w) printf " \001\033[1;31m\002~"
-        
-        # Reset
-        printf "\001\033[0m\002"
-    }')
+    # Behind — bold red (1;31)
+    if (( behind > 0 )); then
+        result+=" ${R}${E}[1;31m${N}↓${behind}"
+    fi
 
-    # Cache result — including empty string, so we don't retry outside git repos.
-    _git_cache="$result"
-    _git_cache_dir="$cwd"
-    _git_cache_time="$now"
+    # Close bracket — bold yellow (1;33)
+    result+="${R}${E}[1;33m${N}]"
+
+    # Staged — bold green (1;32)
+    if (( staged > 0 )); then
+        result+=" ${R}${E}[1;32m${N}+${staged}"
+    fi
+
+    # Modified — bold red (1;31)
+    if (( modified > 0 )); then
+        result+=" ${R}${E}[1;31m${N}~${modified}"
+    fi
+
+    # Untracked — magenta (35)
+    if (( untracked > 0 )); then
+        result+=" ${R}${E}[35m${N}?${untracked}"
+    fi
+
+    result+="${R}${E}[0m${N}"
 
     printf "%s" "$result"
 }
